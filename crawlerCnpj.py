@@ -2,22 +2,34 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import re
+import getInscricao
 
 def crawler(
     cnpj: str, 
     escritorio: str, 
     escritorioId: str,
     tributacao: str,
-    codigoEstabelecimento: str
+    codigoEstabelecimento: str,
+    codigoInterno: str,
+    cfopRet: str,
+    cfop: str,
+    produto: str,
+    nfe: bool,
+    nfse: bool,
+    padrao: str,
+    usuarioReceita: str,
+    usuarioPrefeitura: str,
+    senhaReceita: str,
+    senhaPrefeitura: str,
     ) -> str:
+    
     link = f'https://cnpj.biz/{cnpj}'
     
     headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
     }
 
-    resposta = requests.get(link, headers=headers)
-    #resposta = requests.get(link)
+    resposta = requests.get(link, headers=headers)    
 
     if resposta.status_code == 200:
         soup = BeautifulSoup(resposta.text, 'html.parser')
@@ -34,59 +46,50 @@ def crawler(
                 
         nomeRua = dados.get("Logradouro", "").split(",")[0].strip() 
         numeroCasa = dados.get("Logradouro", "").split(",")[1].strip()  
-        cep = dados.get("CEP", "")        
-       
-        # Remove caracteres não alfanuméricos, espaços e hífens do CEP
+        cep = dados.get("CEP", "")      
+        
         cep = re.sub(r'[^a-zA-Z0-9\s-]', '', cep)
-
-        # Faz a solicitação HTTP para a API do ViaCEP
+        
         url = f"https://viacep.com.br/ws/{cep}/json/"
         response = requests.get(url)
-
-        # Verifica se a solicitação foi bem-sucedida
+        
         if response.status_code == 200:
             data = response.json()
             if 'erro' not in data:
-                print("CEP encontrado:")
-                print(f"CEP: {data['cep']}")
-                print(f"Logradouro: {data['logradouro']}")
-                print(f"Bairro: {data['bairro']}")
-                print(f"Cidade: {data['localidade']}")
-                print(f"Estado: {data['uf']}")
+                print("Sucesso")                
             else:
                 print("CEP não encontrado.")
         else:
             print("Falha ao buscar o CEP. Verifique sua conexão ou tente novamente mais tarde.")     
             
-        if 'localidade' in data:
-            cidade = data['localidade']
-        else:
-            cidade = ""
-
-        if 'uf' in data:
-            uf = data['uf']
-        else:
-            uf = ""       
-        
+    
+        cidade = data['localidade'] if 'localidade' in data else ""
+        uf = data['uf'] if 'uf' in data else "" 
+              
+        if data['localidade'] == 'Curitiba':
+            inscMunicipal = getInscricao.getInscricao(cnpj)
+        else:     
+            inscMunicipal = ''
+            
         dados_Formatados_front = {
-            "inscEstadual": "Não Tem",
+            "inscEstadual": "0",
             "msg": "Não tem",
             "cidade": cidade,
             "uf": uf,
             "situacao": dados.get("Situação", "") ,
-            "importaNfe": False,
+            "importaNfe": nfse,
             "escritorio": escritorio,
             "autFgts": False,
             "autMunicipal": False,
             "cnpj": cnpj,
             "numeroAlvara": "0",
-            "capturaNfe": False,
-            "inscMunicipal": "Não Tem",
+            "capturaNfe": nfse,
+            "inscMunicipal": inscMunicipal,
             "escritorioId": escritorioId,
             "cep": dados.get("CEP", ""),           
             "nomeFantasia": dados.get("Razão Social", ""),
             "complemento": dados.get("Complemento", ""),
-            "inscMunicipalAbreviado": "0",
+            "inscMunicipalAbreviado": inscMunicipal,
             "autCertidao": False,
             "autTst": False,           
             "autFederal": False,
@@ -97,17 +100,29 @@ def crawler(
             "autEstadual": False,
             "active": True,
             "foneFixo": "4199999999",
-            "nfe": True,
+            "nfe": nfe,
+            "nfse": nfse,
             "certification": False,
             "tributacao": tributacao,
             "foneCelResp": "41999999999",
             "codigoEstabelecimento": codigoEstabelecimento,
             "razaoSocial": dados.get("Razão Social", ""),
-            "nomeResponsavel": "Não Tem"
+            "nomeResponsavel": "Não Tem",
+            "codigoInterno": codigoInterno,
+            "cfopRet": cfopRet,
+            "cfop": cfop,
+            "produto": produto,
+            "padrao": padrao,
+            "usuarioReceita": usuarioReceita,
+            "usuarioPrefeitura": usuarioPrefeitura,
+            "senhaReceita": senhaReceita,
+            "senhaPrefeitura": senhaPrefeitura,            
+            "tipoEstabelecimento": "",
+            "certificadoDigitalEmpresa": "",            
         }
 
         return json.dumps({"result": dados_Formatados_front}, ensure_ascii=False, indent=4)
     else:
-        error_message = f"Erro na requisição: {resposta.status_code}"
+        error_message = f"Erro na Resposta: {resposta.status_code}"
         return json.dumps({"error_message": error_message})
 
